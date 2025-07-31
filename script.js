@@ -628,7 +628,6 @@
     }
 
     async function processAndAddReference(audioDataBuffer, fileName, envWindowS, isEnabled) {
-        qs('#status').textContent = `Processing ${fileName}...`;
         const refObject = await generateReferenceDataObject(audioDataBuffer, envWindowS);
         if (refObject) {
             refObject.fileName = fileName;
@@ -636,7 +635,6 @@
             referenceData.push(refObject);
             updateFileListUI();
             qs('#ref-ind').textContent = `${referenceData.length} file(s) loaded`;
-            qs('#status').textContent = `${referenceData.length} reference(s) ready.`;
             qs('#start-btn').disabled = false;
             if (workletNode) sendRefsToWorklet(workletNode);
         }
@@ -821,7 +819,7 @@
         updateButtonText();
         buttonIntervalId = setInterval(updateButtonText, 1000);
 
-        qs('#status').textContent = `Confirmed (${ref.fileName}) → muting`;
+        qs('#status').textContent = `Detected (${ref.fileName}) → muting`;
         setPlayerMuted(true);
 
 
@@ -831,7 +829,7 @@
             qs('#mute-notification')?.remove();
             setPlayerMuted(false);
             hasMuted = false;
-            qs('#status').textContent = 'Unmuted — resuming…';
+            qs('#status').textContent = 'Listening...';
             startBtn.textContent = 'Stop Detection';
 
             if (toggleBtn) toggleBtn.removeAttribute('data-countdown');
