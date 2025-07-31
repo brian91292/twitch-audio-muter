@@ -2,7 +2,7 @@
 // @name         Twitch Envelope+Chromaprint Muter
 // @namespace    http://tampermonkey.net/
 // @version      1.0.0
-// @description  Mutes audio by checking against reference files, so if there are certain sounds you hear frequently on Twitch that trigger you, you can mute for the dutation of the sound (won't work well with really short sounds)
+// @description  Mutes audio by checking against reference files, so if there are certain sounds you hear frequently on Twitch that trigger you, you can mute for the duration of the sound (won't work well with really short sounds)
 // @match        https://www.twitch.tv/*
 // @grant        GM_addStyle
 // @grant        GM_setValue
