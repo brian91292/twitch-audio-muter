@@ -41,6 +41,9 @@
     let unmuteTimeoutId, notificationIntervalId, buttonIntervalId;
     let toggleBtn;
     let workletNode;
+    const pendingCandidates = new Map(); // candidateId -> { ref, fileName }
+    let fpWorker = null;
+    let workerReady = false;
 
     // —— UI & EVENT LISTENERS ——
     window.addEventListener('load', () => {
@@ -257,6 +260,14 @@
 			/* orange/yellow for less efficient fallback */
 			 font-weight: 600;
 		}
+		#fp-ind.worklet {
+		  color: #5cb85c; /* green for worker */
+		  font-weight: 600;
+		}
+		#fp-ind.fallback {
+		  color: #e69500; /* amber for main-thread fallback */
+		  font-weight: 600;
+		}
 		`);
 
         const btn = document.getElementById('start-btn');
@@ -269,6 +280,7 @@
       <button id="start-btn">Start Detection</button>
       <div class="status-row">Chromaprint Engine: <span id="wasm-ind" class="indicator" style="color:#ffc107;">Loading...</span></div>
       <div class="status-row">Detection Engine: <span id="detect-ind" class="indicator">Initializing…</span></div>
+	  <div class="status-row">Fingerprint Engine: <span id="fp-ind" class="indicator">Main Thread</span></div>
 	  <div class="status-row">Reference Audio Files: <span id="ref-ind" class="indicator"></span></div>
       <input type="file" id="ref-input" accept="audio/*" disabled multiple>
       <div id="file-list-container"></div>
@@ -356,6 +368,24 @@
         }, 500);
     }
 
+    function setFingerprintIndicator(useWorker) {
+        const fpInd = qs('#fp-ind');
+        if (!fpInd) return;
+        if (useWorker) {
+            fpInd.textContent = 'Worker';
+            fpInd.title = 'Fingerprinting in Web Worker (preferred)';
+            fpInd.classList.add('worklet');
+            fpInd.classList.remove('fallback');
+            fpInd.style.color = '#5cb85c';
+        } else {
+            fpInd.textContent = 'Main Thread';
+            fpInd.title = 'Fingerprinting on main thread (fallback)';
+            fpInd.classList.add('fallback');
+            fpInd.classList.remove('worklet');
+            fpInd.style.color = '#e69500';
+        }
+    }
+
     // —— INITIALIZATION ——
     async function initialize() {
         const statusEl = qs('#status');
@@ -385,6 +415,87 @@
             qs('#ref-ind').style.color = wasmInd.style.color;
         }
     }
+
+    // —— FINGERPRINT WORKER ——
+    function createFingerprintWorker(wasmUrl) {
+        return new Promise((resolve, reject) => {
+            // worker source as string
+            const workerSrc = `
+		  let ChromaprintModule = null;
+
+		  self.onmessage = async (e) => {
+			const msg = e.data;
+			if (msg.type === 'init') {
+			  try {
+				const wasmBytes = await fetch(msg.wasmUrl).then(r => r.arrayBuffer());
+				ChromaprintModule = await createChromaprintModule({ wasmBinary: wasmBytes });
+				self.postMessage({ type: 'ready' });
+			  } catch (err) {
+				self.postMessage({ type: 'error', error: err.message || String(err) });
+			  }
+			} else if (msg.type === 'fingerprint' && ChromaprintModule) {
+			  const { audioBuffer, sampleRate, candidateId, fileName } = msg;
+			  const fp = await rawFingerprintInWorker(audioBuffer, sampleRate);
+			  self.postMessage({ type: 'result', fingerprint: fp, candidateId, fileName });
+			}
+		  };
+
+		  async function rawFingerprintInWorker(pcm, sr) {
+			const M = ChromaprintModule;
+			const ctx = M._chromaprint_new(1);
+			M._chromaprint_start(ctx, sr, 1);
+			const ptr = M._malloc(pcm.length * 4);
+			M.HEAPF32.set(pcm, ptr / 4);
+			M._chromaprint_feed(ctx, ptr, pcm.length);
+			M._free(ptr);
+			M._chromaprint_finish(ctx);
+			const lenPtr = M._malloc(4);
+			const arrPtr = M._chromaprint_get_raw_fingerprint(ctx, lenPtr);
+			const length = M.HEAPU32[lenPtr >> 2];
+			const codes = Array.from(M.HEAPU32.subarray(arrPtr >> 2, (arrPtr >> 2) + length));
+			M._free(lenPtr);
+			M._chromaprint_free(ctx);
+			return codes;
+		  }
+
+		  // copy/paste createChromaprintModule implementation here (same as main thread)
+		  ${createChromaprintModule.toString().replace(/^function\s+createChromaprintModule/, 'function createChromaprintModule')}
+		`;
+
+            const blob = new Blob([workerSrc], {
+                type: 'application/javascript'
+            });
+            const worker = new Worker(URL.createObjectURL(blob));
+            let ready = false;
+
+            const cleanup = () => {
+                worker.onerror = null;
+                worker.onmessage = null;
+            };
+
+            worker.onmessage = (e) => {
+                const msg = e.data;
+                if (msg.type === 'ready') {
+                    ready = true;
+                    resolve(worker);
+                } else if (msg.type === 'error') {
+                    cleanup();
+                    reject(new Error('Fingerprint worker init failed: ' + msg.error));
+                }
+            };
+            worker.onerror = (err) => {
+                cleanup();
+                reject(err);
+            };
+
+            // kick off initialization
+            worker.postMessage({
+                type: 'init',
+                wasmUrl
+            });
+        });
+    }
+
 
     // —— UI MANAGEMENT ——
     function updateFileListUI() {
@@ -676,19 +787,19 @@
 
         const notif = document.createElement('div');
         notif.id = 'mute-notification';
-		const updateNotifText = () => {
-			const secondsLeft = Math.ceil((countdownEndTime - Date.now()) / 1000);
-			if (secondsLeft >= 0) notif.innerHTML = `🔇 Muting for <b>${secondsLeft}s</b> (match: ${ref.fileName})`;
-			// mirror to toggle badge
-			if (toggleBtn) {
-				if (secondsLeft > 0) {
-					toggleBtn.setAttribute('data-countdown', secondsLeft + 's');
-				} else {
-					toggleBtn.removeAttribute('data-countdown');
-				}
-			}
-		};
-		updateNotifText();
+        const updateNotifText = () => {
+            const secondsLeft = Math.ceil((countdownEndTime - Date.now()) / 1000);
+            if (secondsLeft >= 0) notif.innerHTML = `🔇 Muting for <b>${secondsLeft}s</b> (match: ${ref.fileName})`;
+            // mirror to toggle badge
+            if (toggleBtn) {
+                if (secondsLeft > 0) {
+                    toggleBtn.setAttribute('data-countdown', secondsLeft + 's');
+                } else {
+                    toggleBtn.removeAttribute('data-countdown');
+                }
+            }
+        };
+        updateNotifText();
 
         const videoEl = document.querySelector('video');
         if (videoEl) {
@@ -722,8 +833,8 @@
             hasMuted = false;
             qs('#status').textContent = 'Unmuted — resuming…';
             startBtn.textContent = 'Stop Detection';
-			
-			if (toggleBtn) toggleBtn.removeAttribute('data-countdown');
+
+            if (toggleBtn) toggleBtn.removeAttribute('data-countdown');
 
             // reset buffers
             if (ringBuf) ringBuf.fill(0);
@@ -756,17 +867,29 @@
             isDetecting = false;
             qs('#start-btn').textContent = 'Start Detection';
             qs('#status').textContent = 'Stopped by user.';
-			if (toggleBtn) toggleBtn.removeAttribute('data-countdown');
+            if (fpWorker) {
+                fpWorker.terminate();
+                fpWorker = null;
+                workerReady = false;
+            }
+            pendingCandidates.clear();
+            if (toggleBtn) toggleBtn.removeAttribute('data-countdown');
             if (workletNode) {
                 workletNode.disconnect();
                 workletNode = null;
             }
-			const detEl = qs('#det-engine');
-			if (detEl) {
-			  detEl.textContent = '';
-			  detEl.classList.remove('worklet', 'fallback');
-			  detEl.title = '';
-			}
+            const detEl = qs('#det-engine');
+            if (detEl) {
+                detEl.textContent = '';
+                detEl.classList.remove('worklet', 'fallback');
+                detEl.title = '';
+            }
+            const fpInd = qs('#fp-ind');
+            if (fpInd) {
+                fpInd.textContent = '';
+                fpInd.classList.remove('worklet', 'fallback');
+                fpInd.title = '';
+            }
             if (procNode) {
                 procNode.disconnect();
             }
@@ -792,7 +915,8 @@
         }
 
         audioCtx = new(AudioContext || webkitAudioContext)();
-        // prepare ring/envelope buffers used for fallback/visualization if desired
+
+        // prepare fallback ring/envelope buffers (used if worklet path fails)
         const fpRingSamples = Math.floor(FP_WINDOW_S * audioCtx.sampleRate);
         ringBuf = new Float32Array(fpRingSamples);
         const maxEnvFrames = Math.ceil(MAX_ENV_WINDOW_S * ENV_RATE_HZ);
@@ -804,10 +928,38 @@
 
         srcNode = audioCtx.createMediaElementSource(mediaElement);
 
+        // initialize fingerprint worker (once per start)
+        fpWorker = null;
+        workerReady = false;
+        try {
+            fpWorker = await createFingerprintWorker(wasmUrl);
+            workerReady = true;
+            fpWorker.onmessage = async (e) => {
+                const msg = e.data;
+                if (msg.type === 'result') {
+                    const {
+                        fingerprint,
+                        candidateId
+                    } = msg;
+                    const pending = pendingCandidates.get(candidateId);
+                    if (!pending) return;
+                    const {
+                        ref
+                    } = pending;
+                    pendingCandidates.delete(candidateId);
+                    setFingerprintIndicator(true); // worker path
+                    await evaluateFingerprintResult(ref, fingerprint);
+                }
+            };
+
+        } catch (e) {
+            console.warn('Fingerprint worker failed to initialize; falling back to inline fingerprinting:', e);
+            setFingerprintIndicator(false);
+        }
+
         // try AudioWorklet path
         if (audioCtx.audioWorklet) {
             try {
-                // load/replace module if needed
                 await audioCtx.audioWorklet.addModule(URL.createObjectURL(new Blob([`
 			class DetectorProcessor extends AudioWorkletProcessor {
 			  constructor() {
@@ -877,9 +1029,8 @@
 
 				  const envCheckLen = Math.floor(${DEFAULT_ENV_WINDOW_S} * this.envRateHz);
 				  if (envCheckLen > this.envRing.length) return true;
-				  const start = this.envRing.length - envCheckLen;
 				  let ss = 0;
-				  for (let i = start; i < this.envRing.length; i++) {
+				  for (let i = this.envRing.length - envCheckLen; i < this.envRing.length; i++) {
 					ss += this.envRing[i] * this.envRing[i];
 				  }
 				  const rms = Math.sqrt(ss / envCheckLen);
@@ -911,36 +1062,47 @@
 		  `], {
                     type: 'application/javascript'
                 })));
+
                 workletNode = new AudioWorkletNode(audioCtx, 'detector-processor');
                 srcNode.connect(workletNode);
                 workletNode.connect(audioCtx.destination);
-                // push current refs
                 sendRefsToWorklet(workletNode);
 
                 workletNode.port.onmessage = async (e) => {
                     if (!isDetecting || hasMuted) return;
                     const msg = e.data;
                     if (msg.type === 'candidate') {
-                        const win = msg.audioBuffer; // transferred Float32Array
-                        const liveArr = await rawFingerprint(win, audioCtx.sampleRate);
+                        const win = msg.audioBuffer;
                         const ref = referenceData.find(r => r.fileName === msg.fileName);
                         if (!ref || !ref.isEnabled) return;
-                        const M = Math.min(ref.fpArr.length, liveArr.length);
-                        if (!M) return;
-                        let match = 0;
-                        for (let i = 0; i < M; i++)
-                            if (ref.fpArr[i] === liveArr[i]) match++;
-                        const ratio = match / M;
-                        if (ratio < FP_THRESHOLD) {
-                            qs('#status').textContent = `Listening… (FP miss on ${ref.fileName})`;
-                            return;
+
+                        const candidateId = crypto.randomUUID();
+                        pendingCandidates.set(candidateId, {
+                            ref,
+                            fileName: msg.fileName
+                        });
+
+                        if (workerReady && fpWorker) {
+                            setFingerprintIndicator(true);
+                            fpWorker.postMessage({
+                                type: 'fingerprint',
+                                audioBuffer: win,
+                                sampleRate: audioCtx.sampleRate,
+                                candidateId,
+                                fileName: msg.fileName
+                            }, [win.buffer]);
+                        } else {
+                            // fallback inline fingerprinting path — explicitly update UI too
+                            setFingerprintIndicator(false);
+                            const liveArr = await rawFingerprint(win, audioCtx.sampleRate);
+                            pendingCandidates.delete(candidateId);
+                            await evaluateFingerprintResult(ref, liveArr);
                         }
-                        await handleConfirmedMatch(ref);
                     }
                 };
+
             } catch (e) {
                 console.warn('AudioWorklet failed, falling back to ScriptProcessorNode:', e);
-                // fallback below
                 procNode = audioCtx.createScriptProcessor(4096, 1, 1);
                 srcNode.connect(procNode);
                 procNode.connect(audioCtx.destination);
@@ -953,25 +1115,44 @@
             procNode.connect(audioCtx.destination);
             procNode.onaudioprocess = onAudioProcess;
         }
-		const detInd = qs('#detect-ind');
-		if (detInd) {
-		  if (workletNode) {
-			detInd.textContent = 'AudioWorklet';
-			detInd.title = 'Using AudioWorklet (preferred, lower-latency)';
-			detInd.classList.add('worklet');
-			detInd.classList.remove('fallback');
-			detInd.style.color = '#5cb85c'; // green to signal good/active
-		  } else {
-			detInd.textContent = 'ScriptProcessor';
-			detInd.title = 'Using ScriptProcessorNode (fallback, less efficient)';
-			detInd.classList.add('fallback');
-			detInd.classList.remove('worklet');
-			detInd.style.color = '#ffc107'; // amber like loading/fallback
-		  }
-		}
+
+        // Update detection indicator UI
+        const detInd = qs('#detect-ind');
+        if (detInd) {
+            if (workletNode) {
+                detInd.textContent = 'AudioWorklet';
+                detInd.title = 'Using AudioWorklet (preferred, lower-latency)';
+                detInd.classList.add('worklet');
+                detInd.classList.remove('fallback');
+                detInd.style.color = '#5cb85c';
+            } else {
+                detInd.textContent = 'ScriptProcessor';
+                detInd.title = 'Using ScriptProcessorNode (fallback, less efficient)';
+                detInd.classList.add('fallback');
+                detInd.classList.remove('worklet');
+                detInd.style.color = '#ffc107';
+            }
+        }
+        const fpInd = qs('#fp-ind');
+        if (fpInd) {
+            if (workerReady) {
+                fpInd.textContent = 'Worker';
+                fpInd.title = 'Fingerprinting in Web Worker (preferred)';
+                fpInd.classList.add('worklet');
+                fpInd.classList.remove('fallback');
+                fpInd.style.color = '#5cb85c';
+            } else {
+                fpInd.textContent = 'Main Thread';
+                fpInd.title = 'Fingerprinting on main thread (fallback)';
+                fpInd.classList.add('fallback');
+                fpInd.classList.remove('worklet');
+                fpInd.style.color = '#e69500';
+            }
+        }
 
         qs('#start-btn').textContent = 'Stop Detection';
     }
+
 
 
     function stopDetect() {
@@ -1029,6 +1210,22 @@
         M._free(lenPtr);
         M._chromaprint_free(ctx);
         return codes;
+    }
+
+    async function evaluateFingerprintResult(ref, liveArr) {
+        if (!ref || !ref.isEnabled || hasMuted) return;
+        const M = Math.min(ref.fpArr.length, liveArr.length);
+        if (!M) return;
+        let match = 0;
+        for (let i = 0; i < M; i++) {
+            if (ref.fpArr[i] === liveArr[i]) match++;
+        }
+        const ratio = match / M;
+        if (ratio < FP_THRESHOLD) {
+            qs('#status').textContent = `Listening… (FP miss on ${ref.fileName})`;
+            return;
+        }
+        await handleConfirmedMatch(ref);
     }
 
     // —— WASM loader ——
