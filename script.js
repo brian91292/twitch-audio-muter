@@ -47,206 +47,216 @@
         // —— STYLES ——
         GM_addStyle(`
 		  /* Panel wrapper */
-		  #hybrid-mute {
-			display: none;
-			position: fixed;
-			top: 5rem;
-			right: 1rem;
-			width: 24rem;
-			transform: scale(1.2);
-			transform-origin: top right;
-			background-color: var(--color-background-alt);
-			border: 1px solid var(--color-border-brand);
-			border-radius: var(--border-radius-medium);
-			box-shadow: var(--shadow-elevation-medium);
-			padding: 1rem 1.25rem;
-			font: 1rem var(--font-family, system-ui, sans-serif);
-			color: var(--color-text-high-emphasis);
-			z-index: 10000;
-		  }
-
-		  /* Start/Stop button */
-		  #start-btn {
-			width: 100%;
-			padding: 0.75rem;
-			margin-bottom: 1rem;
-			background-color: var(--color-accent-primary);
-			color: var(--color-text-inverted);
-			border: 1px solid var(--color-border-muted);
-			border-radius: var(--border-radius-small);
-			font-weight: 600;
-			font-size: 1rem;
-			cursor: pointer;
-			transition: background 0.1s ease, border-color 0.1s ease;
-		  }
-		  #start-btn:hover {
-			background-color: var(--color-accent-hover);
-			border-color: var(--color-accent-hover);
-		  }
-
-		  /* Engine & reference count */
-		  #hybrid-mute > div:nth-of-type(1),
-		  #hybrid-mute > div:nth-of-type(2) {
-			display: flex;
-			justify-content: space-between;
-			align-items: center;
-			padding-bottom: 0.25rem;
-			margin-bottom: 0.5rem;
-			border-bottom: 1px solid var(--color-border-muted);
-			font-size: 0.875rem;
-		  }
-
-		  /* Browse input */
-		  #ref-input {
-			font-size: 0;
-			margin-top: 1rem !important;
-			margin-bottom: 0.5rem;
-			border: none;
-		  }
-		  #ref-input::-webkit-file-upload-button,
-		  #ref-input::file-selector-button {
-			font-size: 1rem;
-		  }
-
-		  /* File list section */
-		  #file-list-container {
-			max-height: 8rem;
-			overflow-y: auto;
-			margin-bottom: 1rem;
-			padding-bottom: 0.5rem;
-			border-bottom: 1px solid var(--color-border-muted);
-		  }
-		  .file-entry-row {
-			display: grid;
-			grid-template-columns: auto 1fr 4rem 1rem;
-			align-items: center;
-			gap: 0.5rem;
-			margin-bottom: 0.5rem;
-		  }
-		  .file-entry-row span {
-			font-size: 0.9rem;
-			color: var(--color-text-high-emphasis);
-			overflow: hidden;
-			white-space: nowrap;
-			text-overflow: ellipsis;
-		  }
-		  .file-entry-row .enable-toggle {
-			width: 1.2rem;
-			height: 1.2rem;
-		  }
-
-		  /* Number input with native arrows pinned right */
-		  .file-entry-row .ref-window-input {
-			position: relative;
-			width: 4rem;
-			padding: 0.4rem;                /* uniform padding */
-			font-size: 1rem;
-			text-align: right;
-			border: 1px solid var(--color-border-muted);
-			border-radius: var(--border-radius-small);
-		  }
-		  .file-entry-row .ref-window-input::-webkit-outer-spin-button {
-			display: none;
-		  }
-		  .file-entry-row .ref-window-input::-webkit-inner-spin-button {
-			-webkit-appearance: inner-spin-button;
-			position: absolute;
-			right: 2px;
-			top: 50%;
-			transform: translateY(-50%);
-			margin: 0;
-		  }
-
-		  /* Remove buttons */
-		  .file-entry-row .remove-btn,
-		  .file-entry-row .remove-stale-btn {
-			justify-self: end;
-			padding: 0;
-			width: 1rem;
-			font-size: 1.2rem;
-			color: var(--color-text-low-emphasis);
-			cursor: pointer;
-			transition: color 0.1s ease;
-		  }
-		  .file-entry-row .remove-btn:hover,
-		  .file-entry-row .remove-stale-btn:hover {
-			color: var(--color-danger-text);
-		  }
-
-		  /* Status line */
-		  #status {
-			font-size: 0.875rem;
-			margin-top: 0.5rem;
-		  }
-
-		  /* Mute notification */
-		  #mute-notification {
-			position: fixed;
-			top: 1.2rem;
-			left: 1.2rem;
-			background-color: var(--color-danger-background);
-			color: var(--color-text-inverted);
-			padding: 1rem 1.2rem;
-			border-radius: var(--border-radius-small);
-			box-shadow: var(--shadow-elevation-medium);
-			font-size: 1rem;
-			z-index: 10001;
-		  }
-
-		  /* Twitch UI toggle button */
-		  #muter-toggle-btn {
-			position: relative;
-			background: none;
-			border: none;
-			cursor: pointer;
-			padding: 0.7rem;
-			border-radius: var(--border-radius-small);
-			transition: background 0.1s ease;
-			width: 6.0rem !important;
-			height: 6.0rem !important;
-		  }
-			/* countdown badge in the top‐right */
-		  #muter-toggle-btn::after {
-			content: attr(data-countdown);
-			position: absolute;
-			top: 1rem;
-			right: 0.5rem;
-			background: rgba(0,0,0,0.6);
-			color: white;
-			font-size: 1rem;
-			line-height: 1;
-			padding: 0.2rem 0.5rem;
-			border-radius: 0.3rem;
-			pointer-events: none;
-			white-space: nowrap;
-		  }
-
-		  #muter-toggle-btn:hover {
-			background: var(--color-background-modifier-hover);
-		  }
-		  #muter-toggle-btn img {
-			width: 100% !important;
-			height: 100% !important;
-		  }
-		  #mute-notification {
-			position: absolute;       /* already inside player */
-			top: 0.5rem;
-			left: 0.5rem;
-			background-color: rgba(0, 0, 0, 0.75);   /* dark semi-transparent */
-			color: #ffffff;
-			padding: 0.6rem 1rem;      /* a bit more padding */
-			border-radius: var(--border-radius-small);
-			font-size: 1.1rem;         /* slightly larger text */
-			font-weight: 500;
-			border: 1px solid var(--color-border-muted);
-			box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
-			opacity: 0.9;              /* subtle fade */
-			transition: opacity 0.2s ease;
-			z-index: 10002;            /* above video but below UI chrome */
-		  }
-		  #mute-notification:hover {
-			opacity: 1;                /* fully opaque on hover to read easily */
-		  }
+		 #hybrid-mute {
+			 display: none;
+			 position: fixed;
+			 top: 5rem;
+			 right: 1rem;
+			 width: 24rem;
+			 transform: scale(1.2);
+			 transform-origin: top right;
+			 background-color: var(--color-background-alt);
+			 border: 1px solid var(--color-border-brand);
+			 border-radius: var(--border-radius-medium);
+			 box-shadow: var(--shadow-elevation-medium);
+			 padding: 1rem 1.25rem;
+			 font: 1rem var(--font-family, system-ui, sans-serif);
+			 color: var(--color-text-high-emphasis);
+			 z-index: 10000;
+		}
+		/* Start/Stop button */
+		 #start-btn {
+			 width: 100%;
+			 padding: 0.75rem;
+			 margin-bottom: 1rem;
+			 background-color: var(--color-accent-primary);
+			 color: var(--color-text-inverted);
+			 border: 1px solid var(--color-border-muted);
+			 border-radius: var(--border-radius-small);
+			 font-weight: 600;
+			 font-size: 1rem;
+			 cursor: pointer;
+			 transition: background 0.1s ease, border-color 0.1s ease;
+		}
+		 #start-btn:hover {
+			 background-color: var(--color-accent-hover);
+			 border-color: var(--color-accent-hover);
+		}
+		/* Engine & reference count */
+		 #hybrid-mute > div:nth-of-type(1), #hybrid-mute > div:nth-of-type(2) {
+			 display: flex;
+			 justify-content: space-between;
+			 align-items: center;
+			 padding-bottom: 0.25rem;
+			 margin-bottom: 0.5rem;
+			 border-bottom: 1px solid var(--color-border-muted);
+			 font-size: 0.875rem;
+		}
+		/* Browse input */
+		 #ref-input {
+			 font-size: 0;
+			 margin-top: 1rem !important;
+			 margin-bottom: 0.5rem;
+			 border: none;
+		}
+		 #ref-input::-webkit-file-upload-button, #ref-input::file-selector-button {
+			 font-size: 1rem;
+		}
+		/* File list section */
+		 #file-list-container {
+			 max-height: 8rem;
+			 overflow-y: auto;
+			 margin-bottom: 1rem;
+			 padding-bottom: 0.5rem;
+			 border-bottom: 1px solid var(--color-border-muted);
+		}
+		 .file-entry-row {
+			 display: grid;
+			 grid-template-columns: auto 1fr 4rem 1rem;
+			 align-items: center;
+			 gap: 0.5rem;
+			 margin-bottom: 0.5rem;
+		}
+		 .file-entry-row span {
+			 font-size: 0.9rem;
+			 color: var(--color-text-high-emphasis);
+			 overflow: hidden;
+			 white-space: nowrap;
+			 text-overflow: ellipsis;
+		}
+		 .file-entry-row .enable-toggle {
+			 width: 1.2rem;
+			 height: 1.2rem;
+		}
+		/* Number input with native arrows pinned right */
+		 .file-entry-row .ref-window-input {
+			 position: relative;
+			 width: 4rem;
+			 padding: 0.4rem;
+			/* uniform padding */
+			 font-size: 1rem;
+			 text-align: right;
+			 border: 1px solid var(--color-border-muted);
+			 border-radius: var(--border-radius-small);
+		}
+		 .file-entry-row .ref-window-input::-webkit-outer-spin-button {
+			 display: none;
+		}
+		 .file-entry-row .ref-window-input::-webkit-inner-spin-button {
+			 -webkit-appearance: inner-spin-button;
+			 position: absolute;
+			 right: 2px;
+			 top: 50%;
+			 transform: translateY(-50%);
+			 margin: 0;
+		}
+		/* Remove buttons */
+		 .file-entry-row .remove-btn, .file-entry-row .remove-stale-btn {
+			 justify-self: end;
+			 padding: 0;
+			 width: 1rem;
+			 font-size: 1.2rem;
+			 color: var(--color-text-low-emphasis);
+			 cursor: pointer;
+			 transition: color 0.1s ease;
+		}
+		 .file-entry-row .remove-btn:hover, .file-entry-row .remove-stale-btn:hover {
+			 color: var(--color-danger-text);
+		}
+		/* Status line */
+		 #status {
+			 font-size: 0.875rem;
+			 margin-top: 0.5rem;
+		}
+		/* Mute notification */
+		 #mute-notification {
+			 position: fixed;
+			 top: 1.2rem;
+			 left: 1.2rem;
+			 background-color: var(--color-danger-background);
+			 color: var(--color-text-inverted);
+			 padding: 1rem 1.2rem;
+			 border-radius: var(--border-radius-small);
+			 box-shadow: var(--shadow-elevation-medium);
+			 font-size: 1rem;
+			 z-index: 10001;
+		}
+		/* Twitch UI toggle button */
+		 #muter-toggle-btn {
+			 position: relative;
+			 background: none;
+			 border: none;
+			 cursor: pointer;
+			 padding: 0.7rem;
+			 border-radius: var(--border-radius-small);
+			 transition: background 0.1s ease;
+			 width: 6.0rem !important;
+			 height: 6.0rem !important;
+		}
+		/* default: hide badge */
+		 #muter-toggle-btn::after {
+			 display: none;
+		}
+		/* show badge only when data-countdown exists and is non-empty */
+		 #muter-toggle-btn[data-countdown]:not([data-countdown=""])::after {
+			 content: attr(data-countdown);
+			 display: block;
+			 position: absolute;
+			 top: 1rem;
+			 right: 0.5rem;
+			 background: rgba(0,0,0,0.6);
+			 color: white;
+			 font-size: 1rem;
+			 line-height: 1;
+			 padding: 0.2rem 0.5rem;
+			 border-radius: 0.3rem;
+			 pointer-events: none;
+			 white-space: nowrap;
+		}
+		 #muter-toggle-btn:hover {
+			 background: var(--color-background-modifier-hover);
+		}
+		 #muter-toggle-btn img {
+			 width: 100% !important;
+			 height: 100% !important;
+		}
+		 #mute-notification {
+			 position: absolute;
+			/* already inside player */
+			 top: 0.5rem;
+			 left: 0.5rem;
+			 background-color: rgba(0, 0, 0, 0.75);
+			/* dark semi-transparent */
+			 color: #ffffff;
+			 padding: 0.6rem 1rem;
+			/* a bit more padding */
+			 border-radius: var(--border-radius-small);
+			 font-size: 1.1rem;
+			/* slightly larger text */
+			 font-weight: 500;
+			 border: 1px solid var(--color-border-muted);
+			 box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+			 opacity: 0.9;
+			/* subtle fade */
+			 transition: opacity 0.2s ease;
+			 z-index: 10002;
+			/* above video but below UI chrome */
+		}
+		 #mute-notification:hover {
+			 opacity: 1;
+			/* fully opaque on hover to read easily */
+		}
+		/* Detection engine indicator colors */
+		 #det-engine.worklet {
+			 color: #5cb85c;
+			/* green for efficient path */
+			 font-weight: 600;
+		}
+		 #det-engine.fallback {
+			 color: #e69500;
+			/* orange/yellow for less efficient fallback */
+			 font-weight: 600;
+		}
 		`);
 
         const btn = document.getElementById('start-btn');
@@ -259,6 +269,7 @@
       <button id="start-btn">Start Detection</button>
       <div>Chromaprint Engine: <span id="wasm-ind" class="indicator" style="color:#ffc107;">Loading...</span></div>
       <div>Reference Audio Files: <span id="ref-ind" class="indicator"></span></div>
+	  <div>Detection Engine: <span id="det-engine" class="indicator"></span></div>
       <input type="file" id="ref-input" accept="audio/*" disabled multiple>
       <div id="file-list-container"></div>
       <div id="status">Status: Initializing...</div>
@@ -664,11 +675,19 @@
 
         const notif = document.createElement('div');
         notif.id = 'mute-notification';
-        const updateNotifText = () => {
-            const secondsLeft = Math.ceil((countdownEndTime - Date.now()) / 1000);
-            if (secondsLeft >= 0) notif.innerHTML = `🔇 Muting for <b>${secondsLeft}s</b> (match: ${ref.fileName})`;
-        };
-        updateNotifText();
+		const updateNotifText = () => {
+			const secondsLeft = Math.ceil((countdownEndTime - Date.now()) / 1000);
+			if (secondsLeft >= 0) notif.innerHTML = `🔇 Muting for <b>${secondsLeft}s</b> (match: ${ref.fileName})`;
+			// mirror to toggle badge
+			if (toggleBtn) {
+				if (secondsLeft > 0) {
+					toggleBtn.setAttribute('data-countdown', secondsLeft + 's');
+				} else {
+					toggleBtn.removeAttribute('data-countdown');
+				}
+			}
+		};
+		updateNotifText();
 
         const videoEl = document.querySelector('video');
         if (videoEl) {
@@ -693,17 +712,6 @@
         qs('#status').textContent = `Confirmed (${ref.fileName}) → muting`;
         setPlayerMuted(true);
 
-        let remaining = Math.ceil(muteDurationMs / 1000);
-        toggleBtn.setAttribute('data-countdown', remaining + 's');
-        const cdInterval = setInterval(() => {
-            remaining--;
-            if (remaining <= 0) {
-                clearInterval(cdInterval);
-                toggleBtn.removeAttribute('data-countdown');
-            } else {
-                toggleBtn.setAttribute('data-countdown', remaining + 's');
-            }
-        }, 1000);
 
         unmuteTimeoutId = setTimeout(() => {
             clearInterval(notificationIntervalId);
@@ -713,6 +721,8 @@
             hasMuted = false;
             qs('#status').textContent = 'Unmuted — resuming…';
             startBtn.textContent = 'Stop Detection';
+			
+			if (toggleBtn) toggleBtn.removeAttribute('data-countdown');
 
             // reset buffers
             if (ringBuf) ringBuf.fill(0);
@@ -745,10 +755,17 @@
             isDetecting = false;
             qs('#start-btn').textContent = 'Start Detection';
             qs('#status').textContent = 'Stopped by user.';
+			if (toggleBtn) toggleBtn.removeAttribute('data-countdown');
             if (workletNode) {
                 workletNode.disconnect();
                 workletNode = null;
             }
+			const detEl = qs('#det-engine');
+			if (detEl) {
+			  detEl.textContent = '';
+			  detEl.classList.remove('worklet', 'fallback');
+			  detEl.title = '';
+			}
             if (procNode) {
                 procNode.disconnect();
             }
@@ -935,6 +952,21 @@
             procNode.connect(audioCtx.destination);
             procNode.onaudioprocess = onAudioProcess;
         }
+		if (workletNode) {
+		  qs('#det-engine').textContent = 'AudioWorklet';
+		  qs('#det-engine').classList.add('worklet');
+		  qs('#det-engine').classList.remove('fallback');
+		} else {
+		  qs('#det-engine').textContent = 'ScriptProcessor';
+		  qs('#det-engine').classList.add('fallback');
+		  qs('#det-engine').classList.remove('worklet');
+		}
+		const detEl = qs('#det-engine');
+		if (detEl) {
+		  detEl.title = workletNode
+			? 'Using AudioWorklet (preferred, lower-latency)'
+			: 'Using ScriptProcessorNode (fallback, less efficient)';
+		}
 
         qs('#start-btn').textContent = 'Stop Detection';
     }
