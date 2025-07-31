@@ -1,4 +1,4 @@
-# Twitch Envelope+Chromaprint Muter
+# Twitch Audio Muter
 
 ## What it does
 Listens to Twitch video audio and automatically mutes the player when the live audio matches any of your preloaded “reference” sounds. Matching happens in two stages to avoid false triggers:
