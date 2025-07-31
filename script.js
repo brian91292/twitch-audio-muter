@@ -83,14 +83,14 @@
 			 border-color: var(--color-accent-hover);
 		}
 		/* Engine & reference count */
-		 #hybrid-mute > div:nth-of-type(1), #hybrid-mute > div:nth-of-type(2) {
-			 display: flex;
-			 justify-content: space-between;
-			 align-items: center;
-			 padding-bottom: 0.25rem;
-			 margin-bottom: 0.5rem;
-			 border-bottom: 1px solid var(--color-border-muted);
-			 font-size: 0.875rem;
+		 #hybrid-mute > .status-row {
+		  display: flex;
+		  justify-content: space-between;
+		  align-items: center;
+		  padding-bottom: 0.25rem;
+		  margin-bottom: 0.5rem;
+		  border-bottom: 1px solid var(--color-border-muted);
+		  font-size: 0.875rem;
 		}
 		/* Browse input */
 		 #ref-input {
@@ -267,9 +267,9 @@
         c.id = 'hybrid-mute';
         c.innerHTML = `
       <button id="start-btn">Start Detection</button>
-      <div>Chromaprint Engine: <span id="wasm-ind" class="indicator" style="color:#ffc107;">Loading...</span></div>
-      <div>Reference Audio Files: <span id="ref-ind" class="indicator"></span></div>
-	  <div>Detection Engine: <span id="det-engine" class="indicator"></span></div>
+      <div class="status-row">Chromaprint Engine: <span id="wasm-ind" class="indicator" style="color:#ffc107;">Loading...</span></div>
+      <div class="status-row">Detection Engine: <span id="detect-ind" class="indicator">Initializing…</span></div>
+	  <div class="status-row">Reference Audio Files: <span id="ref-ind" class="indicator"></span></div>
       <input type="file" id="ref-input" accept="audio/*" disabled multiple>
       <div id="file-list-container"></div>
       <div id="status">Status: Initializing...</div>
@@ -372,7 +372,7 @@
             });
 
             statusEl.textContent = 'WASM Ready.';
-            wasmInd.textContent = 'Loaded ✔️';
+            wasmInd.textContent = 'Loaded';
             wasmInd.style.color = '#5cb85c';
             qs('#ref-input').disabled = false;
             qs('#ref-ind').style.color = wasmInd.style.color;
@@ -510,7 +510,7 @@
         }
 
         updateFileListUI();
-        qs('#ref-ind').textContent = `${referenceData.length} file(s) loaded ✔️`;
+        qs('#ref-ind').textContent = `${referenceData.length} file(s) loaded`;
         if (AUTO_START_DETECTION && referenceData.length > 0) {
             startDetect();
         }
@@ -524,7 +524,7 @@
             refObject.isEnabled = isEnabled;
             referenceData.push(refObject);
             updateFileListUI();
-            qs('#ref-ind').textContent = `${referenceData.length} file(s) loaded ✔️`;
+            qs('#ref-ind').textContent = `${referenceData.length} file(s) loaded`;
             qs('#status').textContent = `${referenceData.length} reference(s) ready.`;
             qs('#start-btn').disabled = false;
             if (workletNode) sendRefsToWorklet(workletNode);
@@ -622,7 +622,8 @@
         delete savedFiles[fileNameToRemove];
         await GM_setValue('ref_audio_files', JSON.stringify(savedFiles));
         updateFileListUI();
-        qs('#ref-ind').textContent = `${referenceData.length} file(s) loaded ✔️`;
+        qs('#ref-ind').textContent = `${referenceData.length} file(s) loaded
+`;
         if (!referenceData.length) {
             qs('#status').textContent = 'No references loaded.';
             qs('#start-btn').disabled = true;
@@ -952,20 +953,21 @@
             procNode.connect(audioCtx.destination);
             procNode.onaudioprocess = onAudioProcess;
         }
-		if (workletNode) {
-		  qs('#det-engine').textContent = 'AudioWorklet';
-		  qs('#det-engine').classList.add('worklet');
-		  qs('#det-engine').classList.remove('fallback');
-		} else {
-		  qs('#det-engine').textContent = 'ScriptProcessor';
-		  qs('#det-engine').classList.add('fallback');
-		  qs('#det-engine').classList.remove('worklet');
-		}
-		const detEl = qs('#det-engine');
-		if (detEl) {
-		  detEl.title = workletNode
-			? 'Using AudioWorklet (preferred, lower-latency)'
-			: 'Using ScriptProcessorNode (fallback, less efficient)';
+		const detInd = qs('#detect-ind');
+		if (detInd) {
+		  if (workletNode) {
+			detInd.textContent = 'AudioWorklet';
+			detInd.title = 'Using AudioWorklet (preferred, lower-latency)';
+			detInd.classList.add('worklet');
+			detInd.classList.remove('fallback');
+			detInd.style.color = '#5cb85c'; // green to signal good/active
+		  } else {
+			detInd.textContent = 'ScriptProcessor';
+			detInd.title = 'Using ScriptProcessorNode (fallback, less efficient)';
+			detInd.classList.add('fallback');
+			detInd.classList.remove('worklet');
+			detInd.style.color = '#ffc107'; // amber like loading/fallback
+		  }
 		}
 
         qs('#start-btn').textContent = 'Stop Detection';
